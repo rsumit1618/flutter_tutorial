@@ -1,0 +1,215 @@
+name: Flutter CI/CD
+
+on:
+  push:
+    branches: [ main, develop, ci-cd ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: '3.16.0'
+
+jobs:
+  # =============================================
+  # JOB 1: Build and Test (ALWAYS RUNS)
+  # =============================================
+  build-and-test:
+    name: 🧪 Build and Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🎯 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+
+      - name: 📦 Get dependencies
+        run: flutter pub get
+
+      - name: 🎨 Check formatting
+        run: dart format --set-exit-if-changed lib/ test/
+
+      - name: 🔍 Analyze code
+        run: flutter analyze
+
+      - name: 🧪 Run tests
+        run: flutter test --coverage
+
+      - name: ⬆️ Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test/
+
+      - name: ⬆️ Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+
+  # =============================================
+  # JOB 2: Build APK (ALWAYS RUNS)
+  # =============================================
+  build-apk:
+    name: 📱 Build APK
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    timeout-minutes: 30
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🎯 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+
+      - name: 📦 Get dependencies
+        run: flutter pub get
+
+      - name: 🧹 Clean
+        run: flutter clean
+
+      - name: 🚀 Build APK
+        run: flutter build apk --release --split-per-abi
+
+      - name: ⬆️ Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: build/app/outputs/flutter-apk/*.apk
+
+  # =============================================
+  # JOB 3: Build App Bundle (ALWAYS RUNS)
+  # =============================================
+  build-aab:
+    name: 📦 Build App Bundle
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    timeout-minutes: 30
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🎯 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+
+      - name: 📦 Get dependencies
+        run: flutter pub get
+
+      - name: 🧹 Clean
+        run: flutter clean
+
+      - name: 🚀 Build App Bundle
+        run: flutter build appbundle --release
+
+      - name: ⬆️ Upload App Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-aab
+          path: build/app/outputs/bundle/release/*.aab
+
+  # =============================================
+  # JOB 4: Version Update (ONLY FOR MAIN)
+  # =============================================
+  version-update:
+    name: 🔢 Update Version
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    needs: [build-and-test, build-apk, build-aab]
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🎯 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+
+      - name: 📦 Get dependencies
+        run: flutter pub get
+
+      - name: 🔢 Update version
+        run: |
+          # Get current version
+          CURRENT_VERSION=$(grep 'version:' pubspec.yaml | awk '{print $2}')
+          echo "Current version: $CURRENT_VERSION"
+          
+          # Split version
+          MAJOR=$(echo $CURRENT_VERSION | cut -d. -f1)
+          MINOR=$(echo $CURRENT_VERSION | cut -d. -f2)
+          PATCH=$(echo $CURRENT_VERSION | cut -d. -f3 | cut -d+ -f1)
+          BUILD=$(echo $CURRENT_VERSION | cut -d+ -f2)
+          
+          # Increment patch version
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH+$((BUILD + 1))"
+          echo "New version: $NEW_VERSION"
+          
+          # Update pubspec.yaml
+          sed -i "s/version: .*/version: $NEW_VERSION/" pubspec.yaml
+          
+          # Commit and push
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pubspec.yaml
+          git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+          git push
+
+      - name: ⬆️ Upload updated pubspec
+        uses: actions/upload-artifact@v4
+        with:
+          name: updated-pubspec
+          path: pubspec.yaml
+
+  # =============================================
+  # JOB 5: Deploy (MANUAL TRIGGER ONLY)
+  # =============================================
+  deploy:
+    name: 🚀 Deploy
+    runs-on: ubuntu-latest
+    needs: [build-and-test, build-apk, build-aab]
+    if: github.event_name == 'workflow_dispatch'
+    environment: production
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: build/app/outputs/flutter-apk/
+
+      - name: 📦 Download AAB
+        uses: actions/download-artifact@v4
+        with:
+          name: android-aab
+          path: build/app/outputs/bundle/release/
+
+      - name: 🚀 Deploy message
+        run: |
+          echo "✅ Deployment ready!"
+          echo "📁 APK: $(ls -la build/app/outputs/flutter-apk/)"
+          echo "📁 AAB: $(ls -la build/app/outputs/bundle/release/)"
