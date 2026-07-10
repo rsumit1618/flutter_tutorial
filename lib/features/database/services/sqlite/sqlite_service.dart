@@ -9,9 +9,22 @@ class SqliteService {
 
   static Database? _database;
 
+  // For testing
+  static void setTestDatabase(Database db) {
+    _database = db;
+  }
+
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDatabase();
+    try {
+      _database = await _initDatabase();
+    } catch (e) {
+      print('⚠️ SQLite initialization failed: $e');
+      // If we are in a test environment and initialization fails, 
+      // we might want to return a mock or just throw.
+      // For now, let's rethrow to catch it in tests.
+      rethrow;
+    }
     return _database!;
   }
 

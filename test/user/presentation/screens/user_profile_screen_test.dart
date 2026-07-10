@@ -43,7 +43,8 @@ void main() {
 
           // Assert
           expect(find.text('Name: John Doe'), findsOneWidget);
-          expect(find.text('Age: 30'), findsOneWidget);
+          expect(find.byKey(const Key('userAge')), findsOneWidget);
+          expect(find.text('Age: 30'), findsNWidgets(2)); // Both in Card and Screen
           expect(find.text('✅ Logged In'), findsOneWidget);
           expect(find.byKey(const Key('logoutButton')), findsOneWidget);
           expect(find.byKey(const Key('nameField')), findsNothing);
@@ -119,14 +120,14 @@ void main() {
           await tester.pump();
 
           // Assert
-          expect(find.text('Age: 26'), findsOneWidget);
+          expect(find.text('Age: 26'), findsNWidgets(2));
 
           // Act - Decrease age
           await tester.tap(find.byKey(const Key('decreaseAge')));
           await tester.pump();
 
           // Assert
-          expect(find.text('Age: 25'), findsOneWidget);
+          expect(find.text('Age: 25'), findsNWidgets(2));
         });
   });
 }

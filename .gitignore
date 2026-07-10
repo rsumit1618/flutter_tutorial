@@ -32,10 +32,10 @@ ios/Flutter/Flutter.podspec
 ios/ServiceDefinitions.json
 
 # Fastlane
-fastlane/report.xml
-fastlane/Preview.html
-fastlane/screenshots
-fastlane/test_output
+android/fastlane/report.xml
+android/fastlane/Preview.html
+android/fastlane/screenshots
+android/fastlane/test_output
 
 # Keys
 *.p12
@@ -55,3 +55,12 @@ firebase_options.dart
 secrets/
 keys/
 credentials/
+
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+fastlane/google-play-key.json
+fastlane/README.md

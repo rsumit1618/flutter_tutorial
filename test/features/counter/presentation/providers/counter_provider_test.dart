@@ -53,15 +53,18 @@ void main() {
       when(mockGetCounterUseCase()).thenAnswer((_) async => expectedEntity);
 
       // Act
+      // Reading triggers constructor which calls loadCounter
       final state = container.read(counterProvider);
 
       // Wait for async operation to complete
-      await Future.delayed(Duration.zero);
+      await Future.delayed(const Duration(milliseconds: 50));
+
+      final finalState = container.read(counterProvider);
 
       // Assert
-      expect(state.value, equals(10));
-      expect(state.isLoading, isFalse);
-      expect(state.error, isNull);
+      expect(finalState.value, equals(10));
+      expect(finalState.isLoading, isFalse);
+      expect(finalState.error, isNull);
       verify(mockGetCounterUseCase()).called(1);
     });
 
@@ -133,10 +136,9 @@ void main() {
 
       // Act
       final notifier = container.read(counterProvider.notifier);
+      await Future.delayed(const Duration(milliseconds: 50));
+      
       notifier.resetCounter();
-
-      // Wait for async operation to complete
-      await Future.delayed(Duration.zero);
 
       final state = container.read(counterProvider);
 
@@ -266,10 +268,11 @@ void main() {
       );
 
       // Act
-      final state = errorContainer.read(counterProvider);
+      // Reading triggers loadCounter
+      errorContainer.read(counterProvider);
+      await Future.delayed(const Duration(milliseconds: 50));
 
-      // Wait for async operation to complete
-      await Future.delayed(Duration.zero);
+      final state = errorContainer.read(counterProvider);
 
       // Assert
       expect(state.error, contains('Load failed'));
