@@ -4,7 +4,7 @@ import 'features/database/services/hive/hive_service.dart';
 import 'features/database/services/sqlite/sqlite_service.dart';
 import 'features/home_page.dart';
 
-void main() async {
+Future<void> main() async {
   // ALWAYS initialize binding first(when firebase initialize, Sqlite, Hive, or Platform Channel)
   WidgetsFlutterBinding.ensureInitialized();
 

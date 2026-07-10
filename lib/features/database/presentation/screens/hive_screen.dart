@@ -21,17 +21,21 @@ class _HiveScreenState extends State<HiveScreen> {
   }
 
   Future<void> _loadUsers() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       _users = _hiveService.getAllUsers();
     } catch (e) {
       _showError('Failed to load users: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _addSampleUsers() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       for (int i = 1; i <= 5; i++) {
@@ -49,11 +53,14 @@ class _HiveScreenState extends State<HiveScreen> {
     } catch (e) {
       _showError('Failed to add users: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _clearAllUsers() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       await _hiveService.deleteAllUsers();
@@ -62,20 +69,32 @@ class _HiveScreenState extends State<HiveScreen> {
     } catch (e) {
       _showError('Failed to delete users: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('❌ $message'), backgroundColor: Colors.red),
-    );
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ $message'), backgroundColor: Colors.red),
+        );
+      }
+    });
   }
 
   void _showSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('✅ $message'), backgroundColor: Colors.green),
-    );
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('✅ $message'), backgroundColor: Colors.green),
+        );
+      }
+    });
   }
 
   @override

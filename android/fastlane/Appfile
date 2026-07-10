@@ -1,0 +1,11 @@
+# Your app's package name
+# Find this in: android/app/build.gradle
+# Look for: applicationId "com.example.flutter_tutorial"
+
+package_name('com.sr.flutter_tutorial')  # ⚠️ UPDATE THIS
+
+# For Google Play Store deployment (we'll add later)
+# json_key_file('fastlane/google-play-key.json')
+
+# For Firebase App Distribution (we'll add later)
+# firebase_app_id('YOUR_FIREBASE_APP_ID')

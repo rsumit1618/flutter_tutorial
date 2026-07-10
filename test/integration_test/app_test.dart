@@ -2,124 +2,152 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:flutter_tutorial/main.dart' as app;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
-      IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-      group('End-to-End App Tests', () {
-            testWidgets('Full app flow - counter and user profile', (WidgetTester tester) async {
-                  // Start app
-                  app.main();
-                  await tester.pumpAndSettle();
+  setUpAll(() async {
+    // Initialize sqflite for ffi (unit tests/desktop)
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
 
-                  // ===== Test 1: Counter Screen =====
-                  expect(find.text('Counter Demo'), findsOneWidget);
+    // Mock path_provider
+    const MethodChannel pathChannel = MethodChannel('plugins.flutter.io/path_provider');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(pathChannel, (MethodCall methodCall) async {
+      if (methodCall.method == 'getApplicationDocumentsDirectory') {
+        return '.';
+      }
+      return null;
+    });
 
-                  // Get initial counter value
-                  final initialCounter = tester.widget<Text>(
-                        find.byKey(const Key('counterValue')),
-                  );
-                  final initialValue = int.parse(initialCounter.data!);
+    SharedPreferences.setMockInitialValues({});
+  });
 
-                  // Increment counter
-                  await tester.tap(find.byKey(const Key('incrementButton')));
-                  await tester.pumpAndSettle();
+  group('End-to-End App Tests', () {
+    testWidgets('Full app flow - counter and user profile', (WidgetTester tester) async {
+      // Start app - await it to ensure Hive/SQLite init completes
+      await app.main();
+      await tester.pumpAndSettle();
 
-                  // Verify increment
-                  final afterIncrement = tester.widget<Text>(
-                        find.byKey(const Key('counterValue')),
-                  );
-                  expect(int.parse(afterIncrement.data!), equals(initialValue + 1));
+      // ===== Test 1: Counter Screen =====
+      // Counter screen is shown by default
+      expect(find.byKey(const Key('counterValue')), findsOneWidget);
+      
+      // Verify titles - MainScreen AppBar ("Counter") and CounterScreen AppBar ("Counter Demo")
+      expect(find.text('Counter Demo'), findsOneWidget);
+      expect(find.text('Counter'), findsNWidgets(2)); // AppBar and BottomNav label
 
-                  // Decrement counter
-                  await tester.tap(find.byKey(const Key('decrementButton')));
-                  await tester.pumpAndSettle();
+      // Get initial counter value
+      final initialCounter = tester.widget<Text>(
+        find.byKey(const Key('counterValue')),
+      );
+      final initialValue = int.parse(initialCounter.data!);
 
-                  // Verify decrement
-                  final afterDecrement = tester.widget<Text>(
-                        find.byKey(const Key('counterValue')),
-                  );
-                  expect(int.parse(afterDecrement.data!), equals(initialValue));
+      // Increment counter
+      await tester.tap(find.byKey(const Key('incrementButton')));
+      await tester.pumpAndSettle();
 
-                  // Reset counter
-                  await tester.tap(find.byKey(const Key('resetButton')));
-                  await tester.pumpAndSettle();
+      // Verify increment
+      final afterIncrement = tester.widget<Text>(
+        find.byKey(const Key('counterValue')),
+      );
+      expect(int.parse(afterIncrement.data!), equals(initialValue + 1));
 
-                  // Verify reset
-                  final afterReset = tester.widget<Text>(
-                        find.byKey(const Key('counterValue')),
-                  );
-                  expect(int.parse(afterReset.data!), equals(0));
+      // Decrement counter
+      await tester.tap(find.byKey(const Key('decrementButton')));
+      await tester.pumpAndSettle();
 
-                  // ===== Test 2: Navigate to User Profile =====
-                  await tester.tap(find.byIcon(Icons.person));
-                  await tester.pumpAndSettle();
+      // Verify decrement
+      final afterDecrement = tester.widget<Text>(
+        find.byKey(const Key('counterValue')),
+      );
+      expect(int.parse(afterDecrement.data!), equals(initialValue));
 
-                  expect(find.text('User Profile'), findsOneWidget);
-                  expect(find.text('❌ Logged Out'), findsOneWidget);
+      // Reset counter
+      await tester.tap(find.byKey(const Key('resetButton')));
+      await tester.pumpAndSettle();
 
-                  // Login with valid credentials
-                  await tester.enterText(find.byKey(const Key('nameField')), 'Integration Test');
-                  await tester.enterText(find.byKey(const Key('ageField')), '28');
-                  await tester.tap(find.byKey(const Key('loginButton')));
-                  await tester.pumpAndSettle();
+      // Verify reset
+      final afterReset = tester.widget<Text>(
+        find.byKey(const Key('counterValue')),
+      );
+      expect(int.parse(afterReset.data!), equals(0));
 
-                  // Verify login success
-                  expect(find.text('Name: Integration Test'), findsOneWidget);
-                  expect(find.text('Age: 28'), findsOneWidget);
-                  expect(find.text('✅ Logged In'), findsOneWidget);
+      // ===== Test 2: Navigate to User Profile =====
+      await tester.tap(find.byIcon(Icons.person));
+      await tester.pumpAndSettle();
 
-                  // Update age
-                  await tester.tap(find.byKey(const Key('increaseAge')));
-                  await tester.pumpAndSettle();
-                  expect(find.text('Age: 29'), findsOneWidget);
+      // Verify "User Profile" appears in MainScreen AppBar and UserProfileScreen AppBar
+      expect(find.text('User Profile'), findsNWidgets(2));
+      expect(find.text('❌ Logged Out'), findsOneWidget);
 
-                  // Logout
-                  await tester.tap(find.byKey(const Key('logoutButton')));
-                  await tester.pumpAndSettle();
-                  expect(find.text('❌ Logged Out'), findsOneWidget);
+      // Login with valid credentials
+      await tester.enterText(find.byKey(const Key('nameField')), 'Integration Test');
+      await tester.enterText(find.byKey(const Key('ageField')), '28');
+      await tester.tap(find.byKey(const Key('loginButton')));
+      await tester.pumpAndSettle();
 
-                  // ===== Test 3: Navigate back to Counter =====
-                  await tester.tap(find.byIcon(Icons.exposure_plus_1));
-                  await tester.pumpAndSettle();
+      // Verify login success
+      expect(find.text('Name: Integration Test'), findsOneWidget);
+      expect(find.byKey(const Key('userAge')), findsOneWidget);
+      // Age appears in Card and below buttons
+      expect(find.text('Age: 28'), findsNWidgets(2));
+      expect(find.text('✅ Logged In'), findsOneWidget);
 
-                  expect(find.text('Counter Demo'), findsOneWidget);
-                  final counterValue = tester.widget<Text>(
-                        find.byKey(const Key('counterValue')),
-                  );
-                  expect(int.parse(counterValue.data!), equals(0));
-            });
+      // Update age
+      await tester.tap(find.byKey(const Key('increaseAge')));
+      await tester.pumpAndSettle();
+      expect(find.text('Age: 29'), findsNWidgets(2));
 
-            testWidgets('Counter persists between navigation', (WidgetTester tester) async {
-                  // Start app
-                  app.main();
-                  await tester.pumpAndSettle();
+      // Logout
+      await tester.tap(find.byKey(const Key('logoutButton')));
+      await tester.pumpAndSettle();
+      expect(find.text('❌ Logged Out'), findsOneWidget);
 
-                  // Set counter to specific value
-                  await tester.tap(find.byKey(const Key('incrementButton')));
-                  await tester.pumpAndSettle();
-                  await tester.tap(find.byKey(const Key('incrementButton')));
-                  await tester.pumpAndSettle();
+      // ===== Test 3: Navigate back to Counter =====
+      await tester.tap(find.byIcon(Icons.exposure_plus_1));
+      await tester.pumpAndSettle();
 
-                  // Verify counter value
-                  final counterValue1 = tester.widget<Text>(
-                        find.byKey(const Key('counterValue')),
-                  );
-                  expect(int.parse(counterValue1.data!), equals(2));
+      expect(find.byKey(const Key('counterValue')), findsOneWidget);
+      final counterValue = tester.widget<Text>(
+        find.byKey(const Key('counterValue')),
+      );
+      expect(int.parse(counterValue.data!), equals(0));
+    });
 
-                  // Navigate to profile
-                  await tester.tap(find.byIcon(Icons.person));
-                  await tester.pumpAndSettle();
+    testWidgets('Counter persists between navigation', (WidgetTester tester) async {
+      await app.main();
+      await tester.pumpAndSettle();
 
-                  // Navigate back to counter
-                  await tester.tap(find.byIcon(Icons.exposure_plus_1));
-                  await tester.pumpAndSettle();
+      // Set counter to specific value
+      await tester.tap(find.byKey(const Key('incrementButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('incrementButton')));
+      await tester.pumpAndSettle();
 
-                  // Verify counter still has same value
-                  final counterValue2 = tester.widget<Text>(
-                        find.byKey(const Key('counterValue')),
-                  );
-                  expect(int.parse(counterValue2.data!), equals(2));
-            });
-      });
+      // Verify counter value
+      final counterValue1 = tester.widget<Text>(
+        find.byKey(const Key('counterValue')),
+      );
+      expect(int.parse(counterValue1.data!), equals(2));
+
+      // Navigate to profile
+      await tester.tap(find.byIcon(Icons.person));
+      await tester.pumpAndSettle();
+
+      // Navigate back to counter
+      await tester.tap(find.byIcon(Icons.exposure_plus_1));
+      await tester.pumpAndSettle();
+
+      // Verify counter still has same value
+      final counterValue2 = tester.widget<Text>(
+        find.byKey(const Key('counterValue')),
+      );
+      expect(int.parse(counterValue2.data!), equals(2));
+    });
+  });
 }

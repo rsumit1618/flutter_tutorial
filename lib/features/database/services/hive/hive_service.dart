@@ -14,7 +14,9 @@ class HiveService {
   /// Initialize Hive
   Future<void> init() async {
     await Hive.initFlutter();
-    Hive.registerAdapter(HiveUserModelAdapter());
+    if (!Hive.isAdapterRegistered(0)) {
+      Hive.registerAdapter(HiveUserModelAdapter());
+    }
     _userBox = await Hive.openBox<HiveUserModel>(_userBoxName);
     if (kDebugMode) {
       print('✅ Hive initialized. Users: ${_userBox.length}');
